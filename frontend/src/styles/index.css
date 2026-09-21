@@ -429,6 +429,38 @@ input {
     background: rgba(255, 94, 200, 0.16);
 }
 
+.conv-item.has-unread {
+    background: rgba(255, 94, 200, 0.12);
+}
+
+.conv-item.has-unread:hover {
+    background: rgba(255, 94, 200, 0.2);
+}
+
+.conv-side {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.conv-badge {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: var(--pink-gradient);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(255, 94, 200, 0.5);
+}
+
 .conv-body {
     flex: 1;
     min-width: 0;
@@ -675,6 +707,25 @@ input {
     color: #ffffff;
     border-bottom-right-radius: 6px;
     box-shadow: 0 4px 14px rgba(255, 94, 200, 0.32);
+}
+
+.msg-bubble.highlight {
+    animation: msg-highlight 2.4s ease-out forwards;
+}
+
+@keyframes msg-highlight {
+    0% {
+        transform: scale(1);
+        outline: 3px solid rgba(255, 255, 255, 0.95);
+    }
+    30% {
+        transform: scale(1.04);
+        outline: 3px solid rgba(255, 255, 255, 0.95);
+    }
+    100% {
+        transform: scale(1);
+        outline: 3px solid transparent;
+    }
 }
 
 .msg-text {

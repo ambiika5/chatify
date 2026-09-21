@@ -20,6 +20,7 @@ export default function ChatPage() {
     const [activeConversation, setActiveConversation] =
         useState(null);
     const [messages, setMessages] = useState([]);
+    const [newMessageIds, setNewMessageIds] = useState(() => new Set());
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(false);
@@ -40,15 +41,41 @@ export default function ChatPage() {
     activeRef.current = activeConversation;
 
     const seenIdsRef = useRef(new Set());
+    const unreadCountedIdsRef = useRef(new Set());
     const searchTimerRef = useRef(null);
     const typingTimerRef = useRef(null);
+
+    const highlightMessage = (id) => {
+        setNewMessageIds((previous) => {
+            const next = new Set(previous);
+            next.add(id);
+            return next;
+        });
+
+        setTimeout(() => {
+            setNewMessageIds((previous) => {
+                if (!previous.has(id)) return previous;
+                const next = new Set(previous);
+                next.delete(id);
+                return next;
+            });
+        }, 2600);
+    };
 
     useEffect(() => {
         if (!token) return;
 
         api.myConversations(token)
             .then((data) => {
-                setConversations(data.conversations || []);
+                setConversations(
+                    (data.conversations || []).map(
+                        (conversation) => ({
+                            ...conversation,
+                            unreadCount:
+                                conversation.unreadCount || 0
+                        })
+                    )
+                );
             })
             .catch((error) => {
                 console.error(
@@ -63,7 +90,7 @@ export default function ChatPage() {
 
         const socket = socketManager.connect(token);
 
-        const updateSidebar = (message) => {
+        const updateSidebar = (message, increment = false) => {
             setConversations((previous) => {
                 const index = previous.findIndex(
                     (conversation) =>
@@ -74,10 +101,16 @@ export default function ChatPage() {
                 if (index === -1) return previous;
 
                 const next = [...previous];
+                const current = next[index];
+                const unreadCount = increment
+                    ? (current.unreadCount || 0) + 1
+                    : current.unreadCount || 0;
+
                 next.splice(index, 1);
                 next.unshift({
-                    ...previous[index],
-                    messages: [message]
+                    ...current,
+                    messages: [message],
+                    unreadCount
                 });
 
                 return next;
@@ -107,12 +140,28 @@ export default function ChatPage() {
         };
 
         const onNewMessage = (message) => {
-            updateSidebar(message);
-
             const active = activeRef.current;
+            const me = userRef.current;
+            const isActive =
+                active &&
+                message.conversationId === active.id;
+            const isOwn = me && message.senderId === me.id;
 
-            if (active && message.conversationId === active.id) {
+            let increment = Boolean(!isActive && !isOwn);
+
+            if (increment) {
+                if (unreadCountedIdsRef.current.has(message.id)) {
+                    increment = false;
+                } else {
+                    unreadCountedIdsRef.current.add(message.id);
+                }
+            }
+
+            updateSidebar(message, increment);
+
+            if (isActive) {
                 upsertMessage(message);
+                highlightMessage(message.id);
                 socket.emit("markMessagesRead", {
                     conversationId: active.id
                 });
@@ -121,6 +170,7 @@ export default function ChatPage() {
 
         const onMessageSent = (message) => {
             upsertMessage(message);
+            highlightMessage(message.id);
             updateSidebar(message);
             setSendError(null);
         };
@@ -285,7 +335,16 @@ export default function ChatPage() {
 
         setActiveConversation(conversation);
         seenIdsRef.current = new Set();
+        setNewMessageIds(new Set());
         setMessages([]);
+
+        setConversations((previous) =>
+            previous.map((existing) =>
+                existing.id === conversation.id
+                    ? { ...existing, unreadCount: 0 }
+                    : existing
+            )
+        );
         setPage(1);
         setHasMore(false);
         setTypingUserId(null);
@@ -471,6 +530,7 @@ export default function ChatPage() {
                         <MessageList
                             resetKey={activeConversation.id}
                             messages={messages}
+                            newMessageIds={newMessageIds}
                             typingUserId={typingUserId}
                             partner={partner}
                             hasMore={hasMore}

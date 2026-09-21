@@ -109,6 +109,10 @@ export default function ChatSidebar({
                                         partner={partner}
                                         user={user}
                                         last={last}
+                                        unreadCount={
+                                            conversation.unreadCount ||
+                                            0
+                                        }
                                         active={
                                             conversation.id ===
                                             activeId

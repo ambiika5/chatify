@@ -220,30 +220,47 @@ io.on("connection", async (socket) => {
 
                 for (const message of undeliveredMessages) {
 
-                    const deliveredMessage =
-                        await prisma.message.update({
+                    // Only transition messages still
+                    // in SENT state. A concurrent
+                    // markMessagesRead may have
+                    // already set them to READ, and
+                    // must not be overwritten here.
+
+                    const result =
+                        await prisma.message.updateMany({
                             where: {
-                                id: message.id
+                                id: message.id,
+                                status: "SENT"
                             },
 
                             data: {
                                 status: "DELIVERED"
-                            },
-
-                            include: {
-                                sender: {
-                                    select: {
-                                        id: true,
-                                        username: true
-                                    }
-                                }
                             }
                         });
 
-                    io.to(room).emit(
-                        "messageStatusUpdated",
-                        deliveredMessage
-                    );
+                    if (result.count === 1) {
+
+                        const deliveredMessage =
+                            await prisma.message.findUnique({
+                                where: {
+                                    id: message.id
+                                },
+
+                                include: {
+                                    sender: {
+                                        select: {
+                                            id: true,
+                                            username: true
+                                        }
+                                    }
+                                }
+                            });
+
+                        io.to(room).emit(
+                            "messageStatusUpdated",
+                            deliveredMessage
+                        );
+                    }
                 }
 
             } catch (error) {
@@ -367,6 +384,52 @@ io.on("connection", async (socket) => {
                     "newMessage",
                     message
                 );
+
+                // --------------------------------
+                // Deliver newMessage to the intended
+                // recipient's sockets that have NOT
+                // joined the room, so their sidebar
+                // updates even for unopened
+                // conversations. Reuses the existing
+                // newMessage event. Sender is never
+                // notified here, and sockets already
+                // in the room are skipped to avoid
+                // duplicate delivery.
+                // --------------------------------
+
+                const members =
+                    await prisma.conversationMember.findMany({
+                        where: {
+                            conversationId
+                        },
+                        select: {
+                            userId: true
+                        }
+                    });
+
+                for (const member of members) {
+                    if (member.userId === userId) {
+                        continue;
+                    }
+
+                    for (const client of io.sockets.sockets.values()) {
+                        const clientUserId =
+                            client.user && client.user.userId;
+
+                        if (Number(clientUserId) !== member.userId) {
+                            continue;
+                        }
+
+                        if (client.rooms.has(room)) {
+                            continue;
+                        }
+
+                        client.emit(
+                            "newMessage",
+                            message
+                        );
+                    }
+                }
 
                 // --------------------------------
                 // Tell sender message was saved

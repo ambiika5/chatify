@@ -204,8 +204,54 @@ router.get("/", authMiddleware, async (req, res) => {
             }
         });
 
+        // --------------------------------
+        // Unread count for the current user
+        // --------------------------------
+
+        const conversationIds = conversations.map(
+            (conversation) => conversation.id
+        );
+
+        const unreadRows =
+            conversationIds.length > 0
+                ? await prisma.message.groupBy({
+                      by: ["conversationId"],
+
+                      where: {
+                          conversationId: {
+                              in: conversationIds
+                          },
+
+                          senderId: {
+                              not: req.user.userId
+                          },
+
+                          status: {
+                              not: "READ"
+                          }
+                      },
+
+                      _count: {
+                          _all: true
+                      }
+                  })
+                : [];
+
+        const unreadMap = new Map(
+            unreadRows.map((row) => [
+                row.conversationId,
+                row._count._all
+            ])
+        );
+
+        const result = conversations.map((conversation) => ({
+            ...conversation,
+            unreadCount:
+                unreadMap.get(conversation.id) || 0
+        }));
+
         res.json({
-            conversations
+            conversations: result
         });
 
     } catch (error) {

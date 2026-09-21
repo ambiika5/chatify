@@ -6,6 +6,7 @@ export default function ConversationItem({
     user,
     last,
     active,
+    unreadCount,
     onClick
 }) {
     let preview = "No messages yet";
@@ -17,9 +18,13 @@ export default function ConversationItem({
         preview = `${prefix}${last.content}`;
     }
 
+    const hasUnread = (unreadCount || 0) > 0;
+
     return (
         <button
-            className={`conv-item ${active ? "active" : ""}`}
+            className={`conv-item ${active ? "active" : ""}${
+                hasUnread && !active ? " has-unread" : ""
+            }`}
             onClick={onClick}
         >
             <Avatar name={partner.username} online={partner.isOnline} />
@@ -28,14 +33,23 @@ export default function ConversationItem({
                     <span className="conv-name">
                         {partner.username}
                     </span>
-                    <span
-                        className={`conv-status ${
-                            partner.isOnline ? "online" : ""
-                        }`}
-                    >
-                        {partner.isOnline
-                            ? "Online"
-                            : formatLastSeen(partner.lastSeen)}
+                    <span className="conv-side">
+                        <span
+                            className={`conv-status ${
+                                partner.isOnline ? "online" : ""
+                            }`}
+                        >
+                            {partner.isOnline
+                                ? "Online"
+                                : formatLastSeen(partner.lastSeen)}
+                        </span>
+                        {hasUnread && (
+                            <span className="conv-badge">
+                                {unreadCount > 99
+                                    ? "99+"
+                                    : unreadCount}
+                            </span>
+                        )}
                     </span>
                 </div>
                 <div className="conv-line preview">

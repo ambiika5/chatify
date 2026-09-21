@@ -4,6 +4,7 @@ import TypingIndicator from "./TypingIndicator";
 
 export default function MessageList({
     messages,
+    newMessageIds,
     typingUserId,
     partner,
     hasMore,
@@ -68,6 +69,7 @@ export default function MessageList({
                     key={message.id}
                     message={message}
                     own={message.senderId === myUserId}
+                    highlight={newMessageIds.has(message.id)}
                 />
             ))}
 
